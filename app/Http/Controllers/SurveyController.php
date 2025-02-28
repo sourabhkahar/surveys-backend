@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreServeyAnswerRequest;
 use App\Http\Requests\StoreSurveyRequest;
 use App\Http\Requests\UpdateSurveyRequest;
 use App\Http\Resources\SurveyResource;
 use App\Models\Survey;
+use App\Models\SurveyAnswer;
 use App\Models\SurveyQuestion;
+use App\Models\SurveyQuestionAnswer;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
@@ -177,5 +180,47 @@ class SurveyController extends Controller
         $data = $validator->validate();
         $data['options'] = json_encode($data['options']);
         return SurveyQuestion::create($data);
+    }
+
+    /**
+     * Display the specified resource.
+    */
+    public function surveyForGuest(Survey $survey, Request $request)
+    {
+        return new SurveyResource($survey);
+    }
+
+    public function storeServeyAnswer(StoreServeyAnswerRequest $request, Survey $survey){
+        $data = $request->validated();
+        $surveyAnswer = SurveyAnswer::create([
+            'survey_id' => $survey->id,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s'),
+        ]);
+        foreach ($data['answers'] as $key => $answer) {
+            $questionId = array_keys($answer)[0];
+            $question = SurveyQuestion::Where(['id' => $questionId ,'survey_id' => $survey->id])->get();
+            if(!$question){
+                return response([
+                    'msg'=>"Invalid Question Id",
+                    'status' => 'Error',
+                    'date'=>[]
+                    ],400);
+            }
+            
+            $quesAnswerData = [
+                'survey_question_id' => $questionId,
+                'survey_answer_id' => $surveyAnswer->id,
+                'answer'=> is_array($answer)?json_encode($answer):$answer
+            ]; 
+
+            SurveyQuestionAnswer::create($quesAnswerData);
+        }
+        // return response('Answer Submitted Successfully',200);
+        return response([
+            'msg'=>'Survey Submitted Successfully',
+            'status' => 'success',
+            'date'=>[]
+            ], 200);
     }
 }
