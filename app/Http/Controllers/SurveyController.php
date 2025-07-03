@@ -23,8 +23,27 @@ class SurveyController extends Controller
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        return SurveyResource::collection(Survey::where('user_id', $user->id)->paginate(6));
+        $response['data'] = [];
+        $response['status'] = 'fail';
+        $response['msg'] = 'Something went wrong!';
+        try {
+            $user = $request->user();
+            $surveys = Survey::with('questions') 
+                    ->where('user_id', $user->id)
+                    ->paginate(6);
+            $result = SurveyResource::collection($surveys);
+
+            if(count($result)){
+                $response['data'] = $result;
+                $response['status'] = 'success';
+                $response['msg'] = 'Surveys fetched successfully';
+            } 
+            
+            return $response;
+        } catch (\Throwable $e) {
+            $response['msg'] = $e->getMessage();
+            return $response;
+        }
     }
 
     /**

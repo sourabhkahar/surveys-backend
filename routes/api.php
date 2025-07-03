@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\PapersController;
 use App\Http\Controllers\SurveyController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -14,6 +15,9 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::resource('/survey', SurveyController::class);
+    Route::get('/set-paper/template', [PapersController::class,'getTemplateList']);
+    Route::post('/set-paper/create-paper-from-template/{id}', [PapersController::class,'createPaperFromTemplate']);
+    Route::resource('/set-paper', PapersController::class);
     Route::get('/dashboard/index', [DashboardController::class,'index']);
 });
 

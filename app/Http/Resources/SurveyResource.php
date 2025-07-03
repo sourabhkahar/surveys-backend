@@ -12,7 +12,7 @@ class SurveyResource extends JsonResource
      *
      * @return array<string, mixed>
      */
-    public function toArray(Request $request): array
+    public function toArray($request): array
     {
         return [
             'id'=> $this->id,
@@ -24,7 +24,7 @@ class SurveyResource extends JsonResource
             'created_at'=> $this->created_at,
             'updated_at'=> $this->updated_at,
             'expire_date'=> $this->expire_date,
-            'questions'=> SurveyQuestionResource::collection($this->questions)
+            'questions'=> SurveyQuestionResource::collection($this->whenLoaded('questions'))
         ];
     }
 }
