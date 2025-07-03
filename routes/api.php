@@ -15,9 +15,9 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::resource('/survey', SurveyController::class);
-    Route::get('/set-paper/template', [PapersController::class,'getTemplateList']);
-    Route::post('/set-paper/create-paper-from-template/{id}', [PapersController::class,'createPaperFromTemplate']);
-    Route::resource('/set-paper', PapersController::class);
+    Route::get('/paper/template', [PapersController::class,'getTemplateList']);
+    Route::post('/paper/create-paper-from-template/{id}', [PapersController::class,'createPaperFromTemplate']);
+    Route::resource('/paper', PapersController::class);
     Route::get('/dashboard/index', [DashboardController::class,'index']);
 });
 

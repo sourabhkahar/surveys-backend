@@ -93,27 +93,21 @@ class PapersController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Paper $paper)
+    public function show(Paper $paper,Request $request)
     {   
         $response['data'] = [];
         $response['status'] = 'fail';
         $response['msg'] = 'Something went wrong!';
 
         try {
-            //code...
-            // $paper = $paper->with('sections.questions')->first();
-             
-            // // Here you can add logic to process the template file and create sections/questions as needed
-            // if (!$paper) {
-            //     return response()->json(['msg' => 'Paper not found', 'status' => 'error'], 404);
-            // }
+            
+            if (!$paper) {
+                $response['msg'] = 'Paper not found';
+                return $response;
+            }
 
-            // $response['data'] = $paper;
-            // return $response;
-
-             return $paper;
             return new PaperResources($paper);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return $response;
         }
         

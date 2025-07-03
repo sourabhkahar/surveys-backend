@@ -10,7 +10,7 @@ class Paper extends Model
 
     public function sections()
     {
-        return $this->hasMany(section::class, 'paper_id');
+        return $this->hasMany(Section::class, 'paper_id');
     }
 
 }
