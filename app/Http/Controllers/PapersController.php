@@ -135,7 +135,7 @@ class PapersController extends Controller
 
             //Remove section
             $getSectionIds = array_map(function($item){
-                return $item['id'];
+                return $item['id']??'';
             },$data['sections']); 
             
             $idsToRemove = $paper->sections->filter(function($item) use($getSectionIds) {
@@ -147,7 +147,6 @@ class PapersController extends Controller
             if(count($idsToRemove) > 0){
                 Section::WhereIn('id',$idsToRemove)->delete();
             }
-
             foreach ($data['sections'] as $section) {
 
                 //Update section
@@ -156,35 +155,42 @@ class PapersController extends Controller
                 $updateSection['section_type'] = $section['section_type'];
                 $updateSection['total_marks'] = $section['total_marks'] ?? 0;
                 $updateSection['caption'] = $section['caption']??'';
-                Section::where('id',$section['id'])->update($updateSection);
 
+                if(isset($section['id'])){
+                    Section::where('id',$section['id'])->update($updateSection);
+                } else {
+                    $section['id'] = Section::create($updateSection)->id;
+                }
+                
                 //Remove questions
                 $getQuestionIds = array_map(function($item){
                     return $item['id']??'';
                 },$section['questions']); 
 
-                $getSection = Section::find($section['id']);
-                if($getSection){
-                    $questionsIdsToremove = $getSection->questions->filter(function($item) use($getQuestionIds) {
-                        return !in_array($item->id,$getQuestionIds);
-                    })->map(function ($item) {
-                        return $item->id;
-                    });
-    
-                    if(count($questionsIdsToremove) > 0){
-                        SurveyQuestion::WhereIn('id',$questionsIdsToremove)->delete();
+                if(isset($section['id'])){
+                    $getSection = Section::find($section['id']);
+                    if($getSection){
+                        $questionsIdsToremove = $getSection->questions->filter(function($item) use($getQuestionIds) {
+                            return !in_array($item->id,$getQuestionIds);
+                        })->map(function ($item) {
+                            return $item->id;
+                        });
+        
+                        if(count($questionsIdsToremove) > 0){
+                            SurveyQuestion::WhereIn('id',$questionsIdsToremove)->delete();
+                        }
                     }
                 }
-
                 foreach ($section['questions'] as $question) {
                     //Update questions
                     $updateQuestion['section_id'] = $section['id'];
                     $updateQuestion['question'] = $question['question'];
                     $updateQuestion['type'] = $question['type'];
-                    $updateQuestion['meta'] = $question['meta'];
+                    $updateQuestion['meta'] = $question['meta']??'';
                     $updateQuestion['description'] = $question['description'];
                     $updateQuestion['options'] = isset($question['options']) ? json_encode($question['options']) : null;
                     $updateQuestion['survey_id'] = 0; 
+
                     if(isset($question['id'])){
                         SurveyQuestion::where('id',$question['id'])->update($updateQuestion);
                     } else {
@@ -267,20 +273,21 @@ class PapersController extends Controller
             $sectionCount = 1;
             $section = $phpWord->addSection($sectionStyle);
             foreach ($sections as  $value) {
+
                 $sectionTable = $section->addTable([
-                            'borderSize' => 0,
-                            'cellMargin' => 0,
-                            'width' => 100 * 50,
-                            'borderColor' => 'FFFFFF',
-                        ]);
+                    'borderSize' => 0,
+                    'cellMargin' => 0,
+                    'width' => 100 * 50,
+                    'borderColor' => 'FFFFFF',
+                ]);
+
                 $sectionTable->addRow();
-                
                 $sectionTable->addCell(500, ['align' => 'right'])->addText($sectionChar.'.'.$sectionCount, ['alignment' => 'right']);
                 $sectionTable->addCell(10500, ['align' => 'left'])->addText($value['section_name'],['alignment' => 'left']);
-                $sectionTable->addCell(500, ['align' => 'left'])->addText('(10)', ['alignment' => 'right']);
+                $sectionTable->addCell(500, ['align' => 'left'])->addText('('.$value['total_marks'].')', ['alignment' => 'right']);
                 $questionCount = 1;
 
-                $lineText1 = str_repeat('_', 87);
+                $lineText1 = str_repeat('_', 86);
                 $lineText2 = str_repeat('_', 90);
 
                 $textStyle = [
@@ -296,11 +303,9 @@ class PapersController extends Controller
                 ];
                 
                 $textStyleBold = ['bold' => true, 'color' => '000000'];
-
                 foreach ($value['questions'] as  $value) {
                     if($value['type'] == 'text'){
-
-                         //Line Style
+                        //Line Style
                         $questionTable = $section->addTable([
                             'borderSize' => 0,
                             'cellMargin' => 0,
@@ -316,15 +321,43 @@ class PapersController extends Controller
                                 //Add Ans. on start Of line
                                 if($i == 0){
                                     $textrun = $section->addTextRun($paragraphStyle);
-                                    $textrun->addText('Ans', $textStyleBold);
+                                    $textrun->addText('Ans.', $textStyleBold);
                                     $textrun->addText($lineText1, $textStyle, $paragraphStyle);
                                 } else {
                                     $section->addText($lineText2, $textStyle, $paragraphStyle);
                                 }
                             }
                         }
-                    } 
+                    } else if($value['type'] == 'radio'){
+                        $questionTable = $section->addTable([
+                            'borderSize' => 0,
+                            'cellMargin' => 0,
+                            'width' => 100 * 50,
+                            'borderColor' => 'FFFFFF',
+                        ]);
+                        
+                        $questionTable->addRow();
+                        $questionTable->addCell(500, ['align' => 'right'])->addText($questionCount.'.', ['alignment' => 'right']);
+                        $questionTable->addCell(9500, ['align' => 'left'])->addText($value['question'],['alignment' => 'left']);
+                        $questionTable->addCell(1000, ['align' => 'left'])->addText('(       )', ['alignment' => 'right']);
+
+                        $optionTable = $section->addTable([
+                            'borderSize' => 0,
+                            'cellMargin' => 0,
+                            'width' => 100 * 50,
+                            'borderColor' => 'FFFFFF',
+                        ]);
+                        $optionTable->addRow();
+                        $optionArr = json_decode($value['options']);
+                        $optionChar = 'A';
+                        $optionTable->addCell(500, ['align' => 'right'])->addText();
+                        foreach ($optionArr as $key => $option) {
+                             $optionTable->addCell(3000, ['align' => 'right'])->addText('('.$optionChar.') '.$option->title, ['alignment' => 'right']);
+                             $optionChar++;
+                        }
+                    }
                 }
+
             }
           
            
