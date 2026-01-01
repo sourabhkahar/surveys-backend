@@ -34,7 +34,7 @@ class UpdatePaperRequest extends FormRequest
             'sections.*.questions.*.question' => 'required|string',
             'sections.*.questions.*.id' => 'nullable',
             'sections.*.questions.*.description' => 'nullable',
-            'sections.*.questions.*.type' => 'required|in:text,select,checkbox,radio',
+            // 'sections.*.questions.*.type' => 'required|in:text,select,checkbox,radio',
             'sections.*.questions.*.options' => 'nullable',
             'sections.*.questions.*.meta' => 'nullable',
         ];

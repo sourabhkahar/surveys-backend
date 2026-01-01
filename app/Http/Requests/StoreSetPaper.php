@@ -30,7 +30,7 @@ class StoreSetPaper extends FormRequest
             'sections.*.total_marks' => 'required',
             'sections.*.questions' => 'required|array|min:1',
             'sections.*.questions.*.question' => 'required|string',
-            'sections.*.questions.*.type' => 'required|in:text,select,checkbox,radio',
+            // 'sections.*.questions.*.type' => 'required|in:text,select,checkbox,radio',
             'sections.*.questions.*.options' => 'nullable',
             'sections.*.questions.*.meta' => 'nullable',
         ];
