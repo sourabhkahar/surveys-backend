@@ -71,10 +71,15 @@ class PapersController extends Controller
                 foreach ($section['questions'] as $question) {
                     $question['section_id'] = $resSection->id;
                     $question['question'] = $question['question'];
-                    // $question['type'] = $question['type'];
-                    // $question['meta'] = $question['meta'];
-                    $question['data'] = isset($question['options']) ? json_encode($question['options']) : null;
-                    unset($question['options']); // Remove options if not needed in the model
+                    $options = $question['options'];
+                    if($section['section_type'] != 'matching'){
+                        if(is_array($options) && sizeof($options) > 0){
+                               $options = array_filter($options,function($item){
+                                            return isset($item['title']) && trim($item['title']) !== '';
+                                        }); 
+                        }
+                    }
+                    $question['options'] = isset($question['options']) ? json_encode($question['options']) : null;
                     $question['survey_id'] = 0; // Assuming you want to link
                     SurveyQuestion::create($question);
                 }
@@ -147,7 +152,7 @@ class PapersController extends Controller
             if(count($idsToRemove) > 0){
                 Section::WhereIn('id',$idsToRemove)->delete();
             }
-            foreach ($data['sections'] as $section) {
+            foreach ($data['sections'] as $keySec => $section) {
 
                 //Update section
                 $updateSection['paper_id'] = $paper->id;
@@ -185,10 +190,15 @@ class PapersController extends Controller
                     //Update questions
                     $updateQuestion['section_id'] = $section['id'];
                     $updateQuestion['question'] = $question['question'];
-                    // $updateQuestion['type'] = $question['type'];
-                    // $updateQuestion['meta'] = $question['meta']??'';
-                    // $updateQuestion['description'] = $question['description'];
-                    $updateQuestion['options'] = isset($question['options']) ? json_encode($question['options']) : null;
+                    $options = $question['options'];
+                    if($section['section_type'] != 'matching'){
+                        if(is_array($options) && sizeof($options) > 0){
+                               $options = array_filter($options,function($item){
+                                            return isset($item['title']) && trim($item['title']) !== '';
+                                        }); 
+                        }
+                    }
+                    $updateQuestion['options'] = isset($options) ? json_encode($options) : null;
                     $updateQuestion['survey_id'] = 0; 
 
                     if(isset($question['id'])){
