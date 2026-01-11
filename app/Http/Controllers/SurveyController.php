@@ -30,6 +30,7 @@ class SurveyController extends Controller
             $user = $request->user();
             $surveys = Survey::with('questions') 
                     ->where('user_id', $user->id)
+                    ->orderBy('created_at')
                     ->paginate(6);
             $result = SurveyResource::collection($surveys);
 
