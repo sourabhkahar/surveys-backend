@@ -8,12 +8,12 @@ use App\Models\Paper;
 use App\Models\section;
 use App\Http\Resources\PaperResources;
 use App\Models\SurveyQuestion;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
-use PhpOffice\PhpWord\Element\TextRun;
+use Illuminate\Support\Number;
 use PhpOffice\PhpWord\IOFactory;
-use PhpOffice\PhpWord\Shared\Html;
-use PhpOffice\PhpWord\TemplateProcessor;
+use PhpOffice\PhpWord\Style\Table;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PapersController extends Controller
@@ -59,7 +59,15 @@ class PapersController extends Controller
         try {
             \DB::beginTransaction();
             $data = $request->validated();
-            $result = Paper::create(['title' => $data['title']]);
+            $standard = (int)$data['standard'];
+            $paperData = [
+                            'title' => $data['title'],
+                            'subject' => $data['subject'],
+                            'standard' => Number::ordinal($standard),
+                            'paper_date' => Carbon::parse($data['paper_date'])->format('Y-m-d'),
+                        ];
+            $result = Paper::create($paperData);
+
             foreach ($data['sections'] as $section) {
                 $section['paper_id'] = $result->id;
                 $section['section_name'] = $section['title'];
@@ -134,7 +142,14 @@ class PapersController extends Controller
         try {
             \DB::beginTransaction();
             $data = $request->validated();
-            $result = Paper::where('id', $paper->id)->update(['title' => $data['title']]);
+            $standard = (int)$data['standard'];
+            $paperData = [
+                            'title' => $data['title'],
+                            'subject' => $data['subject'],
+                            'standard' => Number::ordinal($standard),
+                            'paper_date' => Carbon::parse($data['paper_date'])->format('Y-m-d'),
+                        ];
+            $result = Paper::where('id', $paper->id)->update($paperData);
 
             //Remove section
             $getSectionIds = array_map(function ($item) {
@@ -270,6 +285,7 @@ class PapersController extends Controller
             $leftMargin = 300;
             $rightMargin = 300;
             $usableWidth = $pageWidth - $leftMargin - $rightMargin;
+            $sections = $paper['sections'];
 
             $section = $phpWord->addSection([
                 'marginTop' => 300,
@@ -281,7 +297,7 @@ class PapersController extends Controller
             ]);
 
             $firstHeader = $section->addHeader();
-            $firstHeader->firstPage(); 
+            $firstHeader->firstPage();
 
             $col1 = 3440; // Logo
             $col2 = 5360; // Center
@@ -310,17 +326,17 @@ class PapersController extends Controller
 
             $centerCell = $table->addCell($col2);
             $centerCell->addText(
-                'Unit Test : 2026',
+                $paper->title,
                 ['bold' => true, 'size' => 14],
                 ['alignment' => 'center', 'spaceBefore' => 0, 'spaceAfter' => 0]
             );
             $centerCell->addText(
-                'SUB: Environment',
+                "SUB: $paper->subject",
                 ['bold' => true, 'size' => 14],
                 ['alignment' => 'center', 'spaceBefore' => 0, 'spaceAfter' => 0]
             );
             $centerCell->addText(
-                'STD: 3rd',
+                "STD:  $paper->standard",
                 ['bold' => true, 'size' => 14],
                 ['alignment' => 'center', 'spaceBefore' => 0, 'spaceAfter' => 0]
             );
@@ -351,17 +367,19 @@ class PapersController extends Controller
 
             $dateMarksTable->addRow();
             $dateCell = $dateMarksTable->addCell($col1);
+            $paperDate = Carbon::parse($paper->paper_date)->format('d/m/Y');
             $dateCell->addText(
-                'Date : 27/03/2024',
+                "Date : $paperDate",
                 ['bold' => true, 'size' => 14],
                 ['alignment' => 'left', 'spaceBefore' => 0, 'spaceAfter' => 0]
             );
 
             $centerCell = $dateMarksTable->addCell($col2);
 
-            $totalMarkCell = $dateMarksTable->addCell($col3);
+            $totalMarkCell = $dateMarksTable->addCell($col3);   
+            $totalMarks = $sections->sum('total_marks');
             $totalMarkCell->addText(
-                'Total marks: - [80]',
+                "Total marks: - [$totalMarks]",
                 ['bold' => true, 'size' => 14],
                 ['alignment' => 'right', 'spaceBefore' => 0, 'spaceAfter' => 0]
             );
@@ -384,45 +402,36 @@ class PapersController extends Controller
                 ['alignment' => 'right', 'spaceBefore' => 0, 'spaceAfter' => 0]
             );
 
-
-            $sections = $paper['sections'];
-            $sectionChar = 'Q';
-            $sectionCount = 1;
-
             $subsequentHeader = $section->addHeader();
-
-            // Use a table with 100% width (5000 twips is roughly full page, but using % is safer)
             $tableStyle = [
                 'width' => 100 * 50, // This represents 100% width
                 'unit'  => \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT,
-                'cellMarginTop' => 0,
-                'cellMarginBottom' => 0,
+                'cellMarginTop' => 300,
+                'cellMarginBottom' => 300,
             ];
             $restNameAndRoleNo = $subsequentHeader->addTable($tableStyle);
-
             $restNameAndRoleNo->addRow();
 
-            // Cell 1: Name (Give it the most space)
             $restNameAndRoleNo->addCell(null, ['gridSpan' => 1, 'valign' => 'center', 'width' => 65 * 50, 'unit' => 'pct'])
                 ->addText('Name: _________________________________________________', ['bold' => true, 'size' => 12], ['spaceAfter' => 0]);
-
-            // Cell 2: Subject (Flexible width)
             $restNameAndRoleNo->addCell(null, ['width' => 15 * 50, 'unit' => 'pct'])
-                ->addText('Sub: ENV.', ['bold' => true, 'size' => 12], ['spaceAfter' => 0]);
-
-            // Cell 3: Standard (Smaller width)
+                ->addText("Sub: $paper->subject", ['bold' => true, 'size' => 12], ['spaceAfter' => 0]);
             $restNameAndRoleNo->addCell(null, ['width' => 15 * 50, 'unit' => 'pct'])
-                ->addText('Std: 1ST', ['bold' => true, 'size' => 12], ['spaceAfter' => 0]);
-
-            // Cell 4: Roll No (Right Aligned)
+                ->addText("Std: $paper->standard", ['bold' => true, 'size' => 12], ['spaceAfter' => 0]);
             $restNameAndRoleNo->addCell(null, ['width' => 15 * 50, 'unit' => 'pct'])
                 ->addText('Roll No. ______', ['bold' => true, 'size' => 12], ['alignment' => 'right', 'spaceAfter' => 0]);
 
-
+            $phpWord->addParagraphStyle('ansStyle', [
+                                                        'tabs' => [
+                                                            new \PhpOffice\PhpWord\Style\Tab('right', $usableWidth - 1000)
+                                                        ]
+                                                    ]);
+            $sectionChar = 'Q';
+            $sectionCount = 1;
             foreach ($sections as  $secVal) {
 
-                $sectionName = $secVal['section_name'];
-                $sectionCaption = $secVal['caption'];
+                $sectionName = $this->xmlSafe($secVal['section_name']);
+                $sectionCaption = $this->xmlSafe($secVal['caption']);
                 $sectionTable = $section->addTable();
                 $sectionTable->addRow();
                 $sectionTable->addCell(10000)->addText(
@@ -430,17 +439,17 @@ class PapersController extends Controller
                     ['bold' => true, 'size' => 12]
                 );
                 $sectionTable->addCell(2000)->addText(
-                    '(20)',
+                    "(".$secVal['total_marks'].")",
                     ['bold' => true, 'size' => 12],
                     ['alignment' => 'right']
                 );
 
                 $questionCount = 1;
-                $section->addTextBreak(1, ['size' => 4]);
                 foreach ($secVal['questions'] as  $key => $question) {
+                    $ques = $this->xmlSafe($question->question);
                     if ($secVal['section_type'] == 'mcqs') {
                         $section->addText(
-                            "$questionCount) $question->question",
+                            "$questionCount)  $ques",
                             ['size' => 12],
                             ['spaceBefore' => 50, 'spaceAfter' => 50, 'indentation' => [
                                 'left' => 360
@@ -458,7 +467,7 @@ class PapersController extends Controller
                         $optionsArr = json_decode($question->options);
                         if (is_array($optionsArr) && sizeof($optionsArr) > 0) {
                             foreach ($optionsArr as $key => $value) {
-                                $optionVal = $value->title;
+                                $optionVal = $this->xmlSafe($value->title);
                                 array_push($mcqsOptions, "($optionBullet) $optionVal");
                             }
                             $section->addText(
@@ -470,7 +479,7 @@ class PapersController extends Controller
                     } else if ($secVal['section_type'] == 'question_answer') {
 
                         $section->addText(
-                            'Q.' . ($key + 1) . '. ' . $question->question,
+                            'Q.' . ($key + 1) . '. ' .  $ques,
                             ['size' => 12],
                             [
                                 'spaceBefore' => 50,
@@ -478,11 +487,6 @@ class PapersController extends Controller
                             ]
                         );
 
-                        $phpWord->addParagraphStyle('ansStyle', [
-                            'tabs' => [
-                                new \PhpOffice\PhpWord\Style\Tab('right', $usableWidth-1000)
-                            ]
-                        ]);
 
                         $textRun = $section->addTextRun('ansStyle');
 
@@ -491,23 +495,87 @@ class PapersController extends Controller
                             'spaceAfter' => 50,
                         ]);
 
-                      
-                        $textRun->addText("\t", ['underline' => 'single']);
-                        // $section->addTextBreak(1, ['size' => 4]);
 
-                        for ($i = 0; $i < $question->options - 1 ; $i++) {
+                        $textRun->addText("\t", ['underline' => 'single']);
+
+                        for ($i = 0; $i < $question->options - 1; $i++) {
                             $section->addText("", [], [
                                 'borderBottomSize'  => 6,
                                 'borderBottomColor' => '000000',
                                 'spaceBefore'       => 0,
                                 'spaceAfter'        => 0,
-                                'indentRight'       => 720, 
+                                'indentRight'       => 720,
                             ]);
                             $section->addTextBreak(1, ['size' => 5]);
                         }
+                    } else if ($secVal['section_type'] == 'matching') {
+                        $matchAAndBTable = $section->addTable([
+                            // 'borderSize' => 0,
+                            'cellMargin' => 120,
+                            'cellMarginTop' => 0,
+                            'cellMarginBottom' => 0,
+                            'layout' => Table::LAYOUT_AUTO,
+                        ]);
+
+                        $matchAAndBTable->addRow();
+                        $matchAAndBTable->addCell()->addText(
+                            ' ',
+                            ['spaceBefore' => 0, 'spaceAfter' => 0],
+                            ['alignment' => 'center']
+                        );
+                        $matchAAndBTable->addCell()->addText(
+                            'A',
+                            ['bold' => true, 'size' => 12],
+                            ['alignment' => 'center'],
+                            ['spaceBefore' => 0, 'spaceAfter' => 0],
+                        );
+                        $matchAAndBTable->addCell()->addText(
+                            ' - ',
+                            ['spaceBefore' => 0, 'spaceAfter' => 0],
+                            ['alignment' => 'center']
+                        );
+                        $matchAAndBTable->addCell()->addText(
+                            'B',
+                            ['bold' => true, 'size' => 12],
+                            ['alignment' => 'center'],
+                            ['spaceBefore' => 0, 'spaceAfter' => 0],
+                        );
+                        
+                        $optionsArr = json_decode($question->options);
+                        if ( is_array($optionsArr->matchA) && sizeof($optionsArr->matchA) > 0 || 
+                             is_array($optionsArr->matchB) && sizeof($optionsArr->matchB) > 0 ) {
+                            $matchLength = count($optionsArr->matchB) > count($optionsArr->matchA)? count($optionsArr->matchB) : count($optionsArr->matchA);
+                            for ($i=0; $i < $matchLength; $i++) { 
+                                $matchAAndBTable->addRow();
+                                $matchAAndBTable->addCell()->addText(
+                                    ($i+1).'.',
+                                    [ 'size' => 12],
+                                    ['spaceBefore' => 0, 'spaceAfter' => 0]
+                                );
+
+                                $matchAAndBTable->addCell()->addText(
+                                    $optionsArr->matchA[$i],
+                                    [ 'size' => 12],
+                                    ['spaceBefore' => 0, 'spaceAfter' => 0]
+                                );
+
+                                $matchAAndBTable->addCell()->addText(
+                                    ' - ',
+                                    [ 'size' => 12],
+                                    ['spaceBefore' => 0, 'spaceAfter' => 0]
+                                );
+
+                                $matchAAndBTable->addCell()->addText(
+                                    $optionsArr->matchB[$i],
+                                    [ 'size' => 12],
+                                    ['spaceBefore' => 0, 'spaceAfter' => 0]
+                                );
+                            }
+                            $section->addTextBreak(1, ['size' => 1]);
+                        }
                     } else {
                         $section->addText(
-                            ($key + 1) . '.' . $question->question,
+                            ($key + 1) . '.' .  $ques,
                             ['size' => 12],
                             [
                                 'spaceBefore' => 50,
@@ -518,11 +586,9 @@ class PapersController extends Controller
                             ]
                         );
                         $section->addTextBreak(1, ['size' => 1]);
-
                     }
                     $questionCount++;
                 }
-
                 $sectionCount++;
             }
 
@@ -537,6 +603,11 @@ class PapersController extends Controller
         } catch (\Exception $e) {
             return response()->json(['msg' => 'Error: ' . $e->getMessage(), 'status' => 'error'], 500);
         }
+    }
+
+    private function xmlSafe(string $text): string
+    {
+        return htmlspecialchars($text, ENT_XML1 | ENT_COMPAT, 'UTF-8');
     }
 
     public function cmToTwip($cm)

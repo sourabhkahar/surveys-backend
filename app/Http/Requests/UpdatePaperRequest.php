@@ -23,6 +23,9 @@ class UpdatePaperRequest extends FormRequest
     {
         return [
             'title' => 'required',
+            'subject' => 'required',
+            'standard' => 'required',
+            'paper_date' => 'required',
             'sections' => 'required|array|min:1',
             // 'sections.*.id' => 'required',
             // 'sections.*.paper_id' => 'required',

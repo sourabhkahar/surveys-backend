@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Paper extends Model
 {
-    protected $fillable = [ 'title'];
+    protected $fillable = [ 'title','subject','standard','paper_date'];
 
     public function sections()
     {

@@ -23,6 +23,9 @@ class StoreSetPaper extends FormRequest
     {
         return [
             'title' => 'required',
+            'subject' => 'required',
+            'standard' => 'required',
+            'paper_date' => 'required',
             'sections' => 'required|array|min:1',
             'sections.*.title' => 'required|string',
             'sections.*.section_type' => 'required|string',
