@@ -38,7 +38,9 @@ class SurveyController extends Controller
                 $response['data'] = $result;
                 $response['status'] = 'success';
                 $response['msg'] = 'Surveys fetched successfully';
-            } 
+            } else {
+                $response['msg'] = 'No surveys found';
+            }
             
             return $response;
         } catch (\Throwable $e) {

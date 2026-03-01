@@ -12,8 +12,8 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Number;
+use Barryvdh\DomPDF\Facade\Pdf;
 use PhpOffice\PhpWord\IOFactory;
-use PhpOffice\PhpWord\Style\Table;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PapersController extends Controller
@@ -238,9 +238,27 @@ class PapersController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Paper $papers)
+    public function destroy(Paper $paper)
     {
-        //
+        try {
+            // paper also have section and questions so delete them
+            $sections = Section::where('paper_id', $paper->id)->get();
+            foreach ($sections as $section) {
+                SurveyQuestion::where('section_id', $section->id)->delete();
+            }
+            Section::where('paper_id', $paper->id)->delete();
+            $paper->delete();
+            return response([
+                'msg' => 'Paper deleted successfully',
+                'status' => 'success',
+                'data' => $paper
+            ], 200);
+        } catch (\Exception $th) {
+            return response([
+                'msg' => 'Error deleting paper: ' . $th->getMessage(),
+                'status' => 'error'
+            ], 500);
+        }
     }
 
     public function getTemplateList(Request $request)
@@ -448,12 +466,39 @@ class PapersController extends Controller
                 foreach ($secVal['questions'] as  $key => $question) {
                     $ques = $this->xmlSafe($question->question);
                     if ($secVal['section_type'] == 'mcqs') {
-                        $section->addText(
+                        $tableStyle = [
+                                        'borderSize' => 0,
+                                        'borderColor' => 'FFFFFF',
+                                        'cellMargin' => 0
+                                    ];
+
+                        $firstRowStyle = [];
+
+                        $phpWord->addTableStyle('NoBorderTable', $tableStyle, $firstRowStyle);
+
+                        $table = $section->addTable('NoBorderTable');
+
+                        // Add row
+                        $table->addRow();
+
+                        // Left cell (Question)
+                        $table->addCell(9000)->addText(
                             "$questionCount)  $ques",
                             ['size' => 12],
-                            ['spaceBefore' => 50, 'spaceAfter' => 50, 'indentation' => [
-                                'left' => 360
-                            ],]
+                            [
+                                'spaceBefore' => 50,
+                                'spaceAfter'  => 50,
+                                'indentation' => ['left' => 360]
+                            ]
+                        );
+
+                        // Right cell (Bracket aligned right)
+                        $table->addCell(1000)->addText(
+                            '(       )',
+                            ['size' => 12],
+                            [
+                                'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::END
+                            ]
                         );
 
                         $optionBullet = 'a';
@@ -592,7 +637,6 @@ class PapersController extends Controller
                 $sectionCount++;
             }
 
-
             return new StreamedResponse(function () use ($phpWord) {
                 $writer = IOFactory::createWriter($phpWord, 'Word2007');
                 $writer->save('php://output');
@@ -613,5 +657,15 @@ class PapersController extends Controller
     public function cmToTwip($cm)
     {
         return (int) round($cm * 567);
+    }
+
+    public function preview($id)
+    {
+        $paper = Paper::with('sections.questions')->findOrFail($id);
+        $pdf = Pdf::loadView('pdf.paper', compact('paper'))
+            ->setPaper('a4');
+
+        return $pdf->stream('paper-preview.pdf');
+
     }
 }
