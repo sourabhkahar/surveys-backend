@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Number;
 use Barryvdh\DomPDF\Facade\Pdf;
 use PhpOffice\PhpWord\IOFactory;
+use PhpOffice\PhpWord\Style\Table;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PapersController extends Controller
@@ -165,6 +166,7 @@ class PapersController extends Controller
             if (count($idsToRemove) > 0) {
                 Section::WhereIn('id', $idsToRemove)->delete();
             }
+            
             foreach ($data['sections'] as $keySec => $section) {
 
                 //Update section
@@ -553,6 +555,41 @@ class PapersController extends Controller
                             ]);
                             $section->addTextBreak(1, ['size' => 5]);
                         }
+                    } else if ($secVal['section_type'] == 'truefalse') {
+                        $tableStyle = [
+                            'borderSize' => 0,
+                            'borderColor' => 'FFFFFF',
+                            'cellMargin' => 0
+                        ];
+
+                        $firstRowStyle = [];
+
+                        $phpWord->addTableStyle('NoBorderTable', $tableStyle, $firstRowStyle);
+
+                        $table = $section->addTable('NoBorderTable');
+
+                        // Add row
+                        $table->addRow();
+
+                        // Left cell (Question)
+                        $table->addCell(9000)->addText(
+                            "$questionCount)  $ques",
+                            ['size' => 12],
+                            [
+                                'spaceBefore' => 50,
+                                'spaceAfter'  => 50,
+                                'indentation' => ['left' => 360]
+                            ]
+                        );
+
+                        // Right cell (Bracket aligned right)
+                        $table->addCell(1000)->addText(
+                            '(       )',
+                            ['size' => 12],
+                            [
+                                'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::END
+                            ]
+                        );
                     } else if ($secVal['section_type'] == 'matching') {
                         $matchAAndBTable = $section->addTable([
                             // 'borderSize' => 0,
