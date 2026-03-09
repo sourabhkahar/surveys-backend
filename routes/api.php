@@ -16,6 +16,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/paper/template', [PapersController::class,'getTemplateList']);
     Route::post('/paper/create-paper-from-template/{id}', [PapersController::class,'createPaperFromTemplate']);
     Route::get('/paper/preview/{id}', [PapersController::class,'preview']);
+    Route::post('/paper/upload-document', [PapersController::class, 'uploadDocument']);
+    Route::post('/paper/delete-document', [PapersController::class, 'deleteDocument']);
     Route::resource('/paper', PapersController::class);
     Route::get('/dashboard/index', [DashboardController::class,'index']);
 });

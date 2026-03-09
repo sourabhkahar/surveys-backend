@@ -655,6 +655,99 @@ class PapersController extends Controller
                             }
                             $section->addTextBreak(1, ['size' => 1]);
                         }
+                    } else if ($secVal['section_type'] == 'drawing') {
+                        
+                        $optionsArr = json_decode($question->options);
+                        $images = [];
+                        if (is_array($optionsArr)) {
+                            foreach ($optionsArr as $opt) {
+                                if (isset($opt->title) && !empty($opt->title)) {
+                                    $images[] = $opt->title;
+                                }
+                            }
+                        }
+
+                        if (count($images) > 0) {
+                            $imageTable = $section->addTable(['alignment' => \PhpOffice\PhpWord\SimpleType\JcTable::CENTER]);
+                            
+                            // Row 1: up to 3 images
+                            $imageTable->addRow();
+                            for ($i = 0; $i < 3; $i++) {
+                                $cell = $imageTable->addCell(3000);
+                                if (isset($images[$i])) {
+                                    $absolutePath = public_path($images[$i]);
+                                    if (file_exists($absolutePath)) {
+                                        $cell->addImage($absolutePath, [
+                                            'width' => 120, 
+                                            'height' => 120, 
+                                            'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER
+                                        ]);
+                                    } else {
+                                        $cell->addText("[Image Not Found]", ['color' => 'FF0000', 'size' => 8], ['alignment' => 'center']);
+                                    }
+                                    $cell->addText("________________", [], ['alignment' => 'center']);
+                                } else {
+                                    // Add empty text to keep cell spacing for layout if needed, 
+                                    // but usually PhpWord cells without content might collapse.
+                                    // We can leave it or add empty string.
+                                }
+                            }
+
+                            // Row 2: remaining images (up to 2) 
+                            // User wants it starting from middle (3-column layout, col 2 and 3)
+                            if (count($images) > 3) {
+                                $imageTable->addRow();
+                                $imageTable->addCell(3000); // Empty first cell to "start from middle"
+                                for ($i = 3; $i < 5; $i++) {
+                                    $cell = $imageTable->addCell(3000);
+                                    if (isset($images[$i])) {
+                                        $absolutePath = public_path($images[$i]);
+                                        if (file_exists($absolutePath)) {
+                                            $cell->addImage($absolutePath, [
+                                                'width' => 120, 
+                                                'height' => 120, 
+                                                'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER
+                                            ]);
+                                        } else {
+                                            $cell->addText("[Image Not Found]", ['color' => 'FF0000', 'size' => 8], ['alignment' => 'center']);
+                                        }
+                                        $cell->addText("________________", [], ['alignment' => 'center']);
+                                    }
+                                }
+                            }
+                        } else {
+                            $section->addTextBreak(5);
+                            $section->addText("________________________________", [], ['alignment' => 'center']);
+                        }
+                        $section->addTextBreak(1);
+                    } else if ($secVal['section_type'] == 'single_image') {
+                        $section->addText(
+                            $questionCount . ') ' . $ques,
+                            ['size' => 12],
+                            ['spaceBefore' => 100, 'spaceAfter' => 100, 'indentation' => ['left' => 360]]
+                        );
+
+                        $optionsArr = json_decode($question->options);
+                        if (isset($optionsArr[0]->title) && !empty($optionsArr[0]->title)) {
+                            try {
+                                $absolutePath = public_path($optionsArr[0]->title);
+                                if (file_exists($absolutePath)) {
+                                    $section->addImage($absolutePath, [
+                                        'width' => 250,
+                                        'height' => 250,
+                                        'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER
+                                    ]);
+                                } else {
+                                    $section->addText("[Image Not Found]", ['color' => 'FF0000', 'size' => 8], ['alignment' => 'center']);
+                                }
+                            } catch (\Exception $e) {
+                                $section->addText("[Error]", ['size' => 8]);
+                            }
+                        } else {
+                            $section->addTextBreak(5);
+                            $section->addText("________________________________", [], ['alignment' => 'center']);
+                        }
+                        $section->addTextBreak(1);
                     } else {
                         $section->addText(
                             ($key + 1) . '.' .  $ques,
@@ -679,7 +772,9 @@ class PapersController extends Controller
                 $writer->save('php://output');
             }, 200, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'Content-Disposition' => 'attachment; filename="updated.docx"',
+                'Content-Disposition' => 'attachment; filename="' . $paper->title . '.docx"',
+                'Access-Control-Expose-Headers' => 'Content-Disposition, X-File-Name',
+                'X-File-Name' =>  $paper->title . '.docx'
             ]);
         } catch (\Exception $e) {
             return response()->json(['msg' => 'Error: ' . $e->getMessage(), 'status' => 'error'], 500);
@@ -702,7 +797,76 @@ class PapersController extends Controller
         $pdf = Pdf::loadView('pdf.paper', compact('paper'))
             ->setPaper('a4');
 
-        return $pdf->stream('paper-preview.pdf');
+        return $pdf->stream($paper->title . '.pdf', [
+            'Access-Control-Expose-Headers' => 'Content-Disposition, X-File-Name',
+            'X-File-Name' => $paper->title . '.pdf'
+        ]);
 
+    }
+
+    public function uploadDocument(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $name = time().'_'.$file->getClientOriginalName();
+            $destinationPath = public_path('/documents');
+            
+            if (!File::exists($destinationPath)) {
+                File::makeDirectory($destinationPath, 0755, true);
+            }
+            
+            $file->move($destinationPath, $name);
+            $relativePath = 'documents/'.$name;
+
+            return response()->json([
+                'status' => 'success',
+                'path' => $relativePath,
+                'url' => asset($relativePath)
+            ]);
+        }
+
+        return response()->json(['status' => 'error', 'msg' => 'No file uploaded'], 400);
+    }
+
+    public function deleteDocument(Request $request)
+    {
+        $request->validate([
+            'path' => 'required|string',
+            'question_id' => 'nullable|integer'
+        ]);
+
+        $path = $request->input('path');
+        $questionId = $request->input('question_id');
+        $absolutePath = public_path($path);
+
+        // 1. Delete the physical file
+        if (strpos($path, 'documents/') === 0 || strpos($path, 'images/') === 0) {
+            if (File::exists($absolutePath)) {
+                File::delete($absolutePath);
+            }
+        }
+
+        // 2. Delete from Database if question_id is provided
+        if ($questionId) {
+            $question = SurveyQuestion::find($questionId);
+            if ($question && $question->options) {
+                $options = json_decode($question->options, true);
+                if (is_array($options)) {
+                    // Filter out the option with the matching path
+                    $updatedOptions = array_values(array_filter($options, function($opt) use ($path) {
+                        return ($opt['title'] ?? '') !== $path;
+                    }));
+                    
+                    $question->options = json_encode($updatedOptions);
+                    $question->save();
+                }
+            }
+        }
+
+        return response()->json(['status' => 'success', 'msg' => 'File and record updated']);
     }
 }
